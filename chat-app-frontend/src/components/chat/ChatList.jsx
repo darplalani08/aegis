@@ -33,30 +33,94 @@ const formatTime = (dateStr) => {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
+const GroupAvatar = ({ name }) => (
+    <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold', fontSize: '1.2rem', flexShrink: 0 }}>
+        {name ? name.charAt(0).toUpperCase() : 'G'}
+    </div>
+);
+
 const ChatList = ({ chats, activeChat, onSelectChat, onNewChat }) => {
     const [searchQuery, setSearchQuery] = useState('');
-    const { user, API_URL } = useAuth();
+    const [showGroupModal, setShowGroupModal] = useState(false);
+    const [groupName, setGroupName] = useState('');
+    const [userSearch, setUserSearch] = useState('');
+    const [searchResults, setSearchResults] = useState([]);
+    const [selectedUsers, setSelectedUsers] = useState([]);
+    const [creatingGroup, setCreatingGroup] = useState(false);
+
+    const { user, API_URL, authAxios } = useAuth();
     const { onlineUsers } = useSocket();
 
     const filteredChats = useMemo(() => {
         if (!searchQuery.trim()) return chats;
         const q = searchQuery.toLowerCase();
         return chats.filter((c) => {
+            if (c.isGroupChat) return c.chatName?.toLowerCase().includes(q);
             const o = c.otherUser;
             return o?.username?.toLowerCase().includes(q) || o?.name?.toLowerCase().includes(q);
         });
     }, [chats, searchQuery]);
 
+    // Handle user search in modal
+    const handleSearchUsers = async (e) => {
+        const query = e.target.value;
+        setUserSearch(query);
+        if (!query.trim()) {
+            setSearchResults([]);
+            return;
+        }
+        try {
+            const res = await authAxios.get(`/api/auth/users?search=${query}`);
+            setSearchResults(res.data.filter(u => u._id !== user._id));
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const handleCreateGroup = async () => {
+        if (!groupName.trim() || selectedUsers.length < 1) return;
+        setCreatingGroup(true);
+        try {
+            const res = await authAxios.post('/api/chats/group', {
+                name: groupName,
+                users: selectedUsers.map(u => u._id),
+            });
+            onSelectChat(res.data);
+            setShowGroupModal(false);
+            setGroupName('');
+            setSelectedUsers([]);
+            setUserSearch('');
+            setSearchResults([]);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setCreatingGroup(false);
+        }
+    };
+
+    const toggleUserSelection = (u) => {
+        if (selectedUsers.find(su => su._id === u._id)) {
+            setSelectedUsers(selectedUsers.filter(su => su._id !== u._id));
+        } else {
+            setSelectedUsers([...selectedUsers, u]);
+        }
+    };
+
     return (
         <div className="chat-list-panel">
             <div className="chat-list-header">
-                <div className="header-top">
-                    <img
-                        src={user?.profilePic ? (user.profilePic.startsWith('http') ? user.profilePic : `${API_URL}${user.profilePic}`) : getDefaultAvatar(user?.name || user?.username)}
-                        alt="" className="user-avatar"
-                        onError={(e) => { e.target.src = getDefaultAvatar(user?.name || user?.username); }}
-                    />
-                    <span className="user-name-display">{user?.name || user?.username}</span>
+                <div className="header-top" style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <img
+                            src={user?.profilePic ? (user.profilePic.startsWith('http') ? user.profilePic : `${API_URL}${user.profilePic}`) : getDefaultAvatar(user?.name || user?.username)}
+                            alt="" className="user-avatar"
+                            onError={(e) => { e.target.src = getDefaultAvatar(user?.name || user?.username); }}
+                        />
+                        <span className="user-name-display">{user?.name || user?.username}</span>
+                    </div>
+                    <button onClick={() => setShowGroupModal(true)} style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)', border: 'none', width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="New Group">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    </button>
                 </div>
             </div>
 
@@ -77,11 +141,37 @@ const ChatList = ({ chats, activeChat, onSelectChat, onNewChat }) => {
             <div className="chat-items">
                 <AnimatePresence>
                     {filteredChats.map((chat, i) => {
+                        const isActive = activeChat?._id === chat._id;
+                        const lastMsg = chat.lastMessage;
+
+                        if (chat.isGroupChat) {
+                            return (
+                                <motion.div
+                                    key={chat._id}
+                                    className={`chat-item ${isActive ? 'active' : ''}`}
+                                    onClick={() => onSelectChat(chat)}
+                                    initial={{ opacity: 0, x: -15 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    layout
+                                >
+                                    <GroupAvatar name={chat.chatName} />
+                                    <div className="chat-info">
+                                        <div className="chat-name">{chat.chatName}</div>
+                                        <div className="chat-preview">{lastMsg?.text || 'No messages yet'}</div>
+                                    </div>
+                                    <div className="chat-meta">
+                                        <span className="chat-time">{lastMsg ? formatTime(lastMsg.createdAt) : ''}</span>
+                                        {chat.unreadCount > 0 && (
+                                            <motion.span className="unread-badge" initial={{ scale: 0 }} animate={{ scale: 1 }}>{chat.unreadCount}</motion.span>
+                                        )}
+                                    </div>
+                                </motion.div>
+                            );
+                        }
+
                         const other = chat.otherUser;
                         if (!other) return null;
                         const isOnline = onlineUsers.includes(other._id);
-                        const isActive = activeChat?._id === chat._id;
-                        const lastMsg = chat.lastMessage;
 
                         return (
                             <motion.div
@@ -123,6 +213,61 @@ const ChatList = ({ chats, activeChat, onSelectChat, onNewChat }) => {
                     </div>
                 )}
             </div>
+
+            {/* New Group Modal */}
+            <AnimatePresence>
+                {showGroupModal && (
+                    <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                        <motion.div className="modal-content" initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} style={{ width: '90%', maxWidth: 400, padding: 24 }}>
+                            <h2 style={{ fontSize: '1.2rem', marginBottom: 16 }}>Create Group Chat</h2>
+                            <input
+                                type="text"
+                                placeholder="Group Name"
+                                value={groupName}
+                                onChange={e => setGroupName(e.target.value)}
+                                style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid var(--color-border)', marginBottom: 16 }}
+                            />
+                            <div style={{ marginBottom: 16 }}>
+                                <label style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>Add Users</label>
+                                <input
+                                    type="text"
+                                    placeholder="Search users to add..."
+                                    value={userSearch}
+                                    onChange={handleSearchUsers}
+                                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--color-border)', marginTop: 8 }}
+                                />
+                                {searchResults.length > 0 && (
+                                    <div style={{ maxHeight: 150, overflowY: 'auto', border: '1px solid var(--color-border)', borderRadius: 8, marginTop: 8 }}>
+                                        {searchResults.map(u => (
+                                            <div key={u._id} onClick={() => toggleUserSelection(u)} style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', borderBottom: '1px solid var(--color-border)' }}>
+                                                <span>{u.username}</span>
+                                                {selectedUsers.find(su => su._id === u._id) && <span style={{ color: 'var(--color-primary)' }}>✓</span>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {selectedUsers.length > 0 && (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+                                    {selectedUsers.map(u => (
+                                        <span key={u._id} style={{ padding: '4px 10px', background: 'var(--color-primary-light)', color: 'var(--color-primary)', borderRadius: 16, fontSize: '0.75rem' }}>
+                                            {u.username} <span onClick={() => toggleUserSelection(u)} style={{ cursor: 'pointer', marginLeft: 4 }}>×</span>
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+
+                            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                                <button onClick={() => setShowGroupModal(false)} style={{ padding: '8px 16px', background: 'transparent', border: 'none', cursor: 'pointer' }}>Cancel</button>
+                                <button onClick={handleCreateGroup} disabled={creatingGroup || !groupName || selectedUsers.length < 1} className="btn-primary" style={{ padding: '8px 16px', opacity: (creatingGroup || !groupName || selectedUsers.length < 1) ? 0.5 : 1 }}>
+                                    {creatingGroup ? 'Creating...' : 'Create'}
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

@@ -13,7 +13,7 @@ const getColor = (n) => { let h = 0; for (let i = 0; i < (n || '').length; i++) 
 // Generate a default avatar URL using DiceBear
 const getDefaultAvatar = (name) => `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(name || 'User')}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`;
 
-const ContactPanel = ({ otherUser, onSearchChat }) => {
+const ContactPanel = ({ activeChat, otherUser, onSearchChat }) => {
     const { API_URL, authAxios } = useAuth();
     const { onlineUsers } = useSocket();
     const [muted, setMuted] = useState(false);
@@ -23,10 +23,10 @@ const ContactPanel = ({ otherUser, onSearchChat }) => {
 
     // Load actual shared media
     useEffect(() => {
-        if (!otherUser?._id) return;
+        if (!activeChat?._id) return;
         (async () => {
             try {
-                const res = await authAxios.get(`/api/messages/direct/${otherUser._id}?limit=200`);
+                const res = await authAxios.get(`/api/messages/${activeChat._id}?limit=200`);
                 const media = (res.data.messages || [])
                     .filter(m => m.fileUrl && m.fileType === 'image')
                     .slice(-6)
@@ -34,17 +34,23 @@ const ContactPanel = ({ otherUser, onSearchChat }) => {
                 setSharedMedia(media);
             } catch { /* ignore */ }
         })();
-    }, [otherUser?._id, authAxios]);
+    }, [activeChat?._id, authAxios]);
 
-    if (!otherUser) return null;
+    if (!activeChat) return null;
 
-    const avatarUrl = otherUser.profilePic
+    const isGroup = activeChat.isGroupChat;
+    // For direct chats, we definitely need otherUser
+    if (!isGroup && !otherUser) return null;
+
+    const avatarUrl = isGroup ? null : (otherUser?.profilePic
         ? (otherUser.profilePic.startsWith('http') ? otherUser.profilePic : `${API_URL}${otherUser.profilePic}`)
-        : getDefaultAvatar(otherUser.name || otherUser.username);
+        : getDefaultAvatar(otherUser?.name || otherUser?.username || 'User'));
+
+    const displayName = isGroup ? activeChat.chatName : (otherUser?.name || otherUser?.username || 'Unknown User');
 
     const handleMute = () => {
         setMuted(!muted);
-        toast.success(muted ? `Unmuted ${otherUser.name || otherUser.username}` : `Muted ${otherUser.name || otherUser.username}`);
+        toast.success(muted ? `Unmuted ${displayName}` : `Muted ${displayName}`);
     };
 
     const handleSearchConvo = () => {
@@ -58,21 +64,37 @@ const ContactPanel = ({ otherUser, onSearchChat }) => {
         <div className="contact-panel">
             {/* Profile section */}
             <div className="contact-avatar-wrap">
-                <motion.img
-                    src={avatarUrl}
-                    alt={otherUser.name || otherUser.username}
-                    className="contact-avatar"
-                    whileHover={{ scale: 1.05 }}
-                    transition={{ type: 'spring', stiffness: 300 }}
-                    onError={(e) => { e.target.src = getDefaultAvatar(otherUser.name || otherUser.username); }}
-                />
-                <div className="contact-name">{otherUser.name || otherUser.username}</div>
-                <div className="contact-status" style={isOnline ? {} : { color: 'var(--color-text-muted)' }}>
-                    <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: isOnline ? '#22c55e' : '#94a3b8', marginRight: 6 }} />
-                    {isOnline ? 'Active now' : 'Offline'}
-                </div>
-                {otherUser.bio && <div className="contact-role">{otherUser.bio}</div>}
-                {otherUser.email && (
+                {isGroup ? (
+                    <div className="contact-avatar" style={{ background: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold', fontSize: '2rem', margin: '0 auto 15px' }}>
+                        {displayName ? displayName.charAt(0).toUpperCase() : 'G'}
+                    </div>
+                ) : (
+                    <motion.img
+                        src={avatarUrl}
+                        alt={displayName}
+                        className="contact-avatar"
+                        whileHover={{ scale: 1.05 }}
+                        transition={{ type: 'spring', stiffness: 300 }}
+                        onError={(e) => { e.target.src = getDefaultAvatar(displayName); }}
+                    />
+                )}
+
+                <div className="contact-name">{displayName}</div>
+
+                {!isGroup && (
+                    <div className="contact-status" style={isOnline ? {} : { color: 'var(--color-text-muted)' }}>
+                        <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: isOnline ? '#22c55e' : '#94a3b8', marginRight: 6 }} />
+                        {isOnline ? 'Active now' : 'Offline'}
+                    </div>
+                )}
+                {isGroup && (
+                    <div className="contact-status" style={{ color: 'var(--color-text-muted)' }}>
+                        {activeChat.participants?.length || 0} Members
+                    </div>
+                )}
+
+                {!isGroup && otherUser?.bio && <div className="contact-role">{otherUser.bio}</div>}
+                {!isGroup && otherUser?.email && (
                     <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: 4 }}>
                         {otherUser.email}
                     </div>

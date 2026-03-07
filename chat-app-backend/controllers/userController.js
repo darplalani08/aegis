@@ -116,3 +116,22 @@ exports.searchUsers = async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 };
+
+// @desc    Get all users (for contacts list)
+// @route   GET /api/users
+exports.getAllUsers = async (req, res) => {
+    try {
+        // Find all users except the current one, limiting to 100 for basic demonstration
+        const users = await User.find({
+            _id: { $ne: req.user._id }
+        })
+            .select('-password_hash')
+            .limit(100)
+            .sort({ name: 1, username: 1 }); // Sort alphabetically
+
+        res.json(users);
+    } catch (error) {
+        console.error('Get all users error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};

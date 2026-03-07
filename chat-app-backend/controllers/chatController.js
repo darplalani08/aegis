@@ -20,15 +20,21 @@ exports.getChats = async (req, res) => {
         // Count unread messages for each chat
         const chatsWithUnread = await Promise.all(
             chats.map(async (chat) => {
-                const otherUser = chat.participants.find(
-                    (p) => p._id.toString() !== userId.toString()
-                );
                 const unreadCount = await Message.countDocuments({
                     chat_id: chat._id,
                     sender_id: { $ne: userId },
                     status: { $ne: 'read' },
                     deleted: false,
                 });
+
+                if (chat.isGroupChat) {
+                    return { ...chat, unreadCount };
+                }
+
+                // For 1-on-1 chats, identify the other user
+                const otherUser = chat.participants.find(
+                    (p) => p && p._id && p._id.toString() !== userId.toString()
+                );
                 return { ...chat, unreadCount, otherUser };
             })
         );
@@ -36,6 +42,41 @@ exports.getChats = async (req, res) => {
         res.json(chatsWithUnread);
     } catch (error) {
         console.error('Get chats error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// @desc    Create a new group chat
+// @route   POST /api/chats/group
+exports.createGroupChat = async (req, res) => {
+    try {
+        const { name, users } = req.body;
+        const userId = req.user._id;
+
+        if (!name || !users || users.length === 0) {
+            return res.status(400).json({ message: 'Please provide a group name and select users' });
+        }
+
+        // Add current user to participants
+        const participants = [...new Set([...users, userId.toString()])];
+
+        if (participants.length < 2) {
+            return res.status(400).json({ message: 'More than 1 user is required to form a group chat' });
+        }
+
+        const groupChat = await Chat.create({
+            chatName: name,
+            isGroupChat: true,
+            participants,
+            groupAdmin: userId,
+        });
+
+        const fullGroupChat = await Chat.findById(groupChat._id)
+            .populate('participants', 'username profilePic status lastSeen statusMessage');
+
+        res.status(201).json(fullGroupChat);
+    } catch (error) {
+        console.error('Create group chat error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 };

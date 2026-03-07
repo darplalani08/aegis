@@ -38,32 +38,35 @@ const initSocket = (server) => {
             io.to(socket.id).emit('active_users', activeUsers);
         });
 
-        // Send private message
+        // Send private or group message
         socket.on('send_private_message', async (data) => {
-            const { senderId, receiverId, text, fileUrl, fileType, chat_id } = data;
+            const { senderId, receiverId, text, fileUrl, fileType, chat_id, isGroup } = data;
 
             try {
                 // Find or create chat
                 let chatId = chat_id;
+                let chat;
                 if (!chatId) {
-                    let chat = await Chat.findOne({
+                    chat = await Chat.findOne({
                         participants: { $all: [senderId, receiverId], $size: 2 },
                     });
                     if (!chat) {
                         chat = await Chat.create({ participants: [senderId, receiverId] });
                     }
                     chatId = chat._id;
+                } else if (isGroup) {
+                    chat = await Chat.findById(chatId);
                 }
 
                 // Save message
                 const newMessage = await Message.create({
                     sender_id: senderId,
-                    receiver_id: receiverId,
+                    receiver_id: isGroup ? null : receiverId,
                     chat_id: chatId,
                     text: text || '',
                     fileUrl: fileUrl || '',
                     fileType: fileType || '',
-                    status: userSocketMap.has(receiverId) ? 'delivered' : 'sent',
+                    status: (!isGroup && userSocketMap.has(receiverId)) ? 'delivered' : 'sent',
                 });
 
                 // Update chat's lastMessage
@@ -73,19 +76,46 @@ const initSocket = (server) => {
                     .populate('sender_id', 'username profilePic')
                     .lean();
 
-                // Emit to both sender and receiver
-                io.to(receiverId).emit('receive_private_message', { ...populatedMsg, chat_id: chatId });
+                // Emit to sender
                 io.to(senderId).emit('message_sent', { ...populatedMsg, chat_id: chatId });
 
+                // Emit to receiver(s)
+                if (isGroup && chat) {
+                    chat.participants.forEach(participantId => {
+                        const pidStr = participantId.toString();
+                        if (pidStr !== senderId) {
+                            io.to(pidStr).emit('receive_private_message', { ...populatedMsg, chat_id: chatId });
+                        }
+                    });
+                } else {
+                    io.to(receiverId).emit('receive_private_message', { ...populatedMsg, chat_id: chatId });
+                }
+
             } catch (err) {
-                console.error('Error handling private message:', err);
+                console.error('Error handling message:', err);
                 io.to(socket.id).emit('message_error', { error: 'Failed to send message' });
             }
         });
 
         // Typing indicator
-        socket.on('typing', ({ senderId, receiverId, isTyping }) => {
-            io.to(receiverId).emit('display_typing', { senderId, isTyping });
+        socket.on('typing', async ({ senderId, receiverId, isTyping, isGroup }) => {
+            if (isGroup) {
+                try {
+                    const chat = await Chat.findById(receiverId);
+                    if (chat) {
+                        chat.participants.forEach(participantId => {
+                            const pidStr = participantId.toString();
+                            if (pidStr !== senderId) {
+                                io.to(pidStr).emit('display_typing', { senderId, isTyping });
+                            }
+                        });
+                    }
+                } catch (err) {
+                    console.error('Error handling group typing:', err);
+                }
+            } else {
+                io.to(receiverId).emit('display_typing', { senderId, isTyping });
+            }
         });
 
         // Mark messages as read

@@ -19,6 +19,18 @@ const ChatSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
         }],
+        isGroupChat: {
+            type: Boolean,
+            default: false,
+        },
+        chatName: {
+            type: String,
+            trim: true,
+        },
+        groupAdmin: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+        },
     },
     {
         timestamps: true,

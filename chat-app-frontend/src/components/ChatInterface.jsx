@@ -100,7 +100,7 @@ const ChatInterface = () => {
             case 'contacts':
                 return <ContactsView onStartChat={handleStartChatWithUser} />;
             case 'notifications':
-                return <NotificationsView />;
+                return <NotificationsView chats={chats} onSelectChat={handleSelectChat} />;
             case 'search':
                 return <SearchView onStartChat={handleStartChatWithUser} />;
             case 'files':
@@ -131,10 +131,10 @@ const ChatInterface = () => {
             {renderLeftPanel()}
 
             {/* Chat Window */}
-            <ChatWindow chat={activeChat} messages={messages} setMessages={setMessages} />
+            {activeChat && <ChatWindow chat={activeChat} messages={messages} setMessages={setMessages} />}
 
             {/* Right Contact Info Panel */}
-            {otherUser && <ContactPanel otherUser={otherUser} />}
+            {activeChat && <ContactPanel activeChat={activeChat} otherUser={otherUser} />}
 
             {/* Profile Panel */}
             <AnimatePresence>

@@ -181,3 +181,31 @@ exports.markAsRead = async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 };
+
+// @desc    Get all shared media for a user across all their chats
+// @route   GET /api/messages/media/all
+exports.getAllSharedMedia = async (req, res) => {
+    try {
+        const userId = req.user._id;
+
+        // 1. Find all chats the user is a participant of
+        const userChats = await Chat.find({ participants: userId }).select('_id');
+        const chatIds = userChats.map(chat => chat._id);
+
+        // 2. Find all messages in those chats that have a fileUrl
+        const mediaMessages = await Message.find({
+            chat_id: { $in: chatIds },
+            fileUrl: { $exists: true, $ne: '' },
+            deleted: false
+        })
+            .sort({ createdAt: -1 })
+            .populate('sender_id', 'username profilePic')
+            .populate('chat_id', 'chatName isGroupChat participants')
+            .lean();
+
+        res.json(mediaMessages);
+    } catch (error) {
+        console.error('Get all shared media error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};

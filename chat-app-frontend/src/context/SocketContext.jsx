@@ -55,8 +55,8 @@ export const SocketProvider = ({ children }) => {
         socketRef.current?.emit('send_private_message', data);
     }, []);
 
-    const emitTyping = useCallback((senderId, receiverId, isTyping) => {
-        socketRef.current?.emit('typing', { senderId, receiverId, isTyping });
+    const emitTyping = useCallback((senderId, receiverId, isTyping, isGroup = false) => {
+        socketRef.current?.emit('typing', { senderId, receiverId, isTyping, isGroup });
     }, []);
 
     const markRead = useCallback((senderId, receiverId) => {

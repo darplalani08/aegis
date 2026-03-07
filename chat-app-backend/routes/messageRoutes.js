@@ -8,9 +8,12 @@ const {
     deleteMessage,
     addReaction,
     markAsRead,
+    getAllSharedMedia,
 } = require('../controllers/messageController');
 
+router.get('/media/all', protect, getAllSharedMedia);
 router.get('/:chatId', protect, getMessages);
+router.get('/group/:chatId', protect, getMessages);
 router.get('/direct/:userId', protect, getDirectMessages);
 router.put('/read/:senderId', protect, markAsRead);
 router.put('/:messageId', protect, editMessage);

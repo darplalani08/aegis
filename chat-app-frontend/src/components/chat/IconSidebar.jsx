@@ -9,6 +9,7 @@ const avatarColors = [
     'linear-gradient(135deg, #f093fb, #f5576c)',
 ];
 const getColor = (n) => { let h = 0; for (let i = 0; i < (n || '').length; i++) h = n.charCodeAt(i) + ((h << 5) - h); return avatarColors[Math.abs(h) % avatarColors.length]; };
+const getDefaultAvatar = (name) => `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(name || 'User')}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`;
 
 const IconNavbar = ({ activeTab, onTabChange, onProfileClick }) => {
     const { user, API_URL } = useAuth();
@@ -96,13 +97,13 @@ const IconNavbar = ({ activeTab, onTabChange, onProfileClick }) => {
                 </div>
 
                 {/* User Avatar */}
-                {user?.profilePic ? (
-                    <img src={`${API_URL}${user.profilePic}`} alt="" className="nav-avatar" onClick={onProfileClick} />
-                ) : (
-                    <div className="nav-avatar-initials" style={{ background: getColor(user?.username) }} onClick={onProfileClick}>
-                        {(user?.name || user?.username || '?').charAt(0).toUpperCase()}
-                    </div>
-                )}
+                <img
+                    src={user?.profilePic ? (user.profilePic.startsWith('http') ? user.profilePic : `${API_URL}${user.profilePic}`) : getDefaultAvatar(user?.name || user?.username)}
+                    alt=""
+                    className="nav-avatar"
+                    onClick={onProfileClick}
+                    onError={(e) => { e.target.src = getDefaultAvatar(user?.name || user?.username); }}
+                />
             </div>
         </div>
     );

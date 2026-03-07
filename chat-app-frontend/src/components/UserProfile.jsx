@@ -6,6 +6,7 @@ import { useTheme } from '../context/ThemeContext';
 
 const avatarColors = ['linear-gradient(135deg, #667eea, #764ba2)', 'linear-gradient(135deg, #4facfe, #00f2fe)', 'linear-gradient(135deg, #43e97b, #38f9d7)'];
 const getColor = (n) => { let h = 0; for (let i = 0; i < (n || '').length; i++) h = n.charCodeAt(i) + ((h << 5) - h); return avatarColors[Math.abs(h) % avatarColors.length]; };
+const getDefaultAvatar = (name) => `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(name || 'User')}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`;
 
 const UserProfile = ({ onClose, onLogout }) => {
     const { user, updateUser, authAxios, API_URL } = useAuth();
@@ -33,13 +34,12 @@ const UserProfile = ({ onClose, onLogout }) => {
             </div>
 
             <div style={{ textAlign: 'center', marginBottom: 24 }}>
-                {user?.profilePic ? (
-                    <img src={`${API_URL}${user.profilePic}`} alt="" style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--color-primary)' }} />
-                ) : (
-                    <div style={{ width: 80, height: 80, borderRadius: '50%', background: getColor(user?.username), display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '1.8rem', margin: '0 auto' }}>
-                        {(user?.name || user?.username || '?').charAt(0).toUpperCase()}
-                    </div>
-                )}
+                <img
+                    src={user?.profilePic ? (user.profilePic.startsWith('http') ? user.profilePic : `${API_URL}${user.profilePic}`) : getDefaultAvatar(user?.name || user?.username)}
+                    alt=""
+                    onError={(e) => { e.target.src = getDefaultAvatar(user?.name || user?.username); }}
+                    style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--color-primary)' }}
+                />
                 <h3 style={{ marginTop: 10, fontSize: '0.95rem', fontWeight: 600 }}>{user?.name || user?.username}</h3>
                 <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.78rem' }}>@{user?.username}</p>
             </div>

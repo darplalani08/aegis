@@ -20,6 +20,12 @@ const formatTime = (d) => {
     return new Date(d).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 };
 
+const GroupAvatar = ({ name }) => (
+    <div className="avatar" style={{ background: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold', fontSize: '1.2rem' }}>
+        {name ? name.charAt(0).toUpperCase() : 'G'}
+    </div>
+);
+
 const ChatWindow = ({ chat, messages, setMessages }) => {
     const { user, authAxios, API_URL } = useAuth();
     const { onlineUsers, typingUsers, sendMessage, emitTyping, markRead } = useSocket();
@@ -41,27 +47,36 @@ const ChatWindow = ({ chat, messages, setMessages }) => {
     }, []);
 
     useEffect(() => {
-        if (!other?._id) return;
+        if (!other?._id && !chat.isGroupChat) return; // Only fetch if it's a direct chat or a group chat with an ID
         (async () => {
             setLoading(true);
             try {
-                const res = await authAxios.get(`/api/messages/direct/${other._id}?limit=100`);
+                const endpoint = chat.isGroupChat ? `/api/messages/group/${chat._id}?limit=100` : `/api/messages/direct/${other._id}?limit=100`;
+                const res = await authAxios.get(endpoint);
                 setMessages(res.data.messages || []);
-                markRead(other._id, user._id);
+                if (!chat.isGroupChat) {
+                    markRead(other._id, user._id);
+                }
             } catch (e) { console.error(e); }
             finally { setLoading(false); }
         })();
-    }, [other?._id]);
+    }, [other?._id, chat._id, chat.isGroupChat]);
 
     useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
     const handleSend = useCallback((text, fileUrl, fileType) => {
         if (!text?.trim() && !fileUrl) return;
-        sendMessage({ senderId: user._id, receiverId: other._id, text: text || '', fileUrl: fileUrl || '', fileType: fileType || '', chat_id: chat._id });
-        setMessages(prev => [...prev, { _id: 'local_' + Date.now(), sender_id: user._id, receiver_id: other._id, text: text || '', fileUrl: fileUrl || '', fileType: fileType || '', status: 'sent', createdAt: new Date().toISOString(), reactions: [], edited: false, deleted: false }]);
+        const messageData = { senderId: user._id, text: text || '', fileUrl: fileUrl || '', fileType: fileType || '' };
+        if (chat.isGroupChat) {
+            sendMessage({ ...messageData, chat_id: chat._id, isGroup: true });
+            setMessages(prev => [...prev, { _id: 'local_' + Date.now(), sender_id: user._id, chat_id: chat._id, text: text || '', fileUrl: fileUrl || '', fileType: fileType || '', status: 'sent', createdAt: new Date().toISOString(), reactions: [], edited: false, deleted: false }]);
+        } else {
+            sendMessage({ ...messageData, receiverId: other._id, chat_id: chat._id });
+            setMessages(prev => [...prev, { _id: 'local_' + Date.now(), sender_id: user._id, receiver_id: other._id, text: text || '', fileUrl: fileUrl || '', fileType: fileType || '', status: 'sent', createdAt: new Date().toISOString(), reactions: [], edited: false, deleted: false }]);
+        }
     }, [user, other, chat, sendMessage, setMessages]);
 
-    const handleTyping = useCallback((v) => { if (other) emitTyping(user._id, other._id, v); }, [user, other, emitTyping]);
+    const handleTyping = useCallback((v) => { if (other || chat.isGroupChat) emitTyping(user._id, chat.isGroupChat ? chat._id : other._id, v, chat.isGroupChat); }, [user, other, chat, emitTyping]);
 
     const handleDeleteMessage = async (msgId) => {
         try {
@@ -79,24 +94,29 @@ const ChatWindow = ({ chat, messages, setMessages }) => {
     const handleExportChat = () => {
         if (!messages.length) { toast.error('No messages to export'); setShowMenu(false); return; }
         const lines = messages.map(m => {
-            const sender = (typeof m.sender_id === 'object' ? m.sender_id._id : m.sender_id) === user._id ? 'You' : (other.name || other.username);
+            const sender = (typeof m.sender_id === 'object' ? m.sender_id._id : m.sender_id) === user._id ? 'You' : (chat.isGroupChat ? (typeof m.sender_id === 'object' ? (m.sender_id.name || m.sender_id.username) : 'Unknown') : (other.name || other.username));
             return `[${formatTime(m.createdAt)}] ${sender}: ${m.deleted ? '[deleted]' : m.text}`;
         });
         const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = `chat-${other.name || other.username}.txt`; a.click();
+        a.href = url; a.download = `chat-${chat.isGroupChat ? chat.chatName : (other.name || other.username)}.txt`; a.click();
         URL.revokeObjectURL(url);
         toast.success('Chat exported!');
         setShowMenu(false);
     };
 
     // Get avatar src for other user
-    const otherAvatar = other?.profilePic
-        ? (other.profilePic.startsWith('http') ? other.profilePic : `${API_URL}${other.profilePic}`)
-        : getDefaultAvatar(other?.name || other?.username);
+    const otherAvatar = other
+        ? (other.profilePic?.startsWith('http') ? other.profilePic : `${API_URL}${other.profilePic || ''}`)
+        : '';
 
-    if (!other) {
+    // Fallback if no profilePic is available
+    const finalOtherAvatar = otherAvatar && otherAvatar !== `${API_URL}`
+        ? otherAvatar
+        : getDefaultAvatar(other?.name || other?.username || 'User');
+
+    if (!other && !chat.isGroupChat) {
         return (
             <div className="chat-window">
                 <div className="empty-chat">
@@ -113,13 +133,30 @@ const ChatWindow = ({ chat, messages, setMessages }) => {
             {/* Header */}
             <div className="chat-window-header">
                 <div className="user-info">
-                    <img src={otherAvatar} alt="" className="avatar" onError={(e) => { e.target.src = getDefaultAvatar(other.name || other.username); }} />
-                    <div>
-                        <div className="user-name">{other.name || other.username}</div>
-                        <div className={`user-status ${isOnline ? '' : 'offline'}`}>
-                            {isOnline ? 'Active now' : 'Offline'}
-                        </div>
-                    </div>
+                    {chat.isGroupChat ? (
+                        <>
+                            <GroupAvatar name={chat.chatName} />
+                            <div>
+                                <h3 className="user-name">{chat.chatName}</h3>
+                                <div className="user-status" style={{ color: 'var(--color-text-muted)' }}>
+                                    {chat.participants?.length} members
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div style={{ position: 'relative' }}>
+                                <img src={finalOtherAvatar} alt="" className="avatar" onError={(e) => { e.target.src = getDefaultAvatar(other?.name || other?.username || 'User'); }} />
+                                {isOnline && <span className="online-dot" style={{ position: 'absolute', bottom: 0, right: 0, width: 10, height: 10, background: '#22c55e', borderRadius: '50%', border: '2px solid white' }} />}
+                            </div>
+                            <div>
+                                <h3 className="user-name">{other?.name || other?.username || 'Unknown User'}</h3>
+                                <div className="user-status" style={isOnline ? { color: '#22c55e' } : {}}>
+                                    {isOnline ? 'Online' : (other?.lastSeen ? `Last seen ${formatTime(other.lastSeen)}` : 'Offline')}
+                                </div>
+                            </div>
+                        </>
+                    )}
                 </div>
                 <div className="header-actions" ref={menuRef} style={{ position: 'relative' }}>
                     <button title="More options" onClick={() => setShowMenu(!showMenu)}>
@@ -138,7 +175,7 @@ const ChatWindow = ({ chat, messages, setMessages }) => {
                                 exit={{ opacity: 0, scale: 0.9, y: -5 }}
                                 transition={{ duration: 0.15 }}
                             >
-                                <button className="dropdown-item" onClick={() => { navigator.clipboard.writeText(other.email || other.username); toast.success('Copied!'); setShowMenu(false); }}>
+                                <button className="dropdown-item" onClick={() => { navigator.clipboard.writeText(chat.isGroupChat ? chat.chatName : (other?.email || other?.username || '')); toast.success('Copied!'); setShowMenu(false); }}>
                                     📋 Copy Info
                                 </button>
                                 <button className="dropdown-item" onClick={handleExportChat}>
@@ -150,9 +187,11 @@ const ChatWindow = ({ chat, messages, setMessages }) => {
                                 <button className="dropdown-item" onClick={handleClearChat}>
                                     🗑️ Clear Chat
                                 </button>
-                                <button className="dropdown-item" style={{ color: '#EF4444' }} onClick={() => { toast('Block user coming soon', { icon: '🚫' }); setShowMenu(false); }}>
-                                    🚫 Block User
-                                </button>
+                                {!chat.isGroupChat && (
+                                    <button className="dropdown-item" style={{ color: '#EF4444' }} onClick={() => { toast('Block user coming soon', { icon: '🚫' }); setShowMenu(false); }}>
+                                        🚫 Block User
+                                    </button>
+                                )}
                             </motion.div>
                         )}
                     </AnimatePresence>
@@ -187,9 +226,17 @@ const ChatWindow = ({ chat, messages, setMessages }) => {
                         return (
                             <motion.div key={msg._id} className={`message-row ${isSent ? 'sent' : 'received'}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
                                 {!isSent && (
-                                    <img src={otherAvatar} alt="" className="msg-avatar" onError={(e) => { e.target.src = getDefaultAvatar(other.name || other.username); }} />
+                                    <img
+                                        src={typeof msg.sender_id === 'object' && msg.sender_id.profilePic ? `${API_URL}${msg.sender_id.profilePic}` : getDefaultAvatar(typeof msg.sender_id === 'object' ? (msg.sender_id.name || msg.sender_id.username) : '')}
+                                        alt="" className="msg-avatar"
+                                    />
                                 )}
-                                <div>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: isSent ? 'flex-end' : 'flex-start' }}>
+                                    {!isSent && chat.isGroupChat && typeof msg.sender_id === 'object' && (
+                                        <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', marginBottom: 2, marginLeft: 4 }}>
+                                            {msg.sender_id.name || msg.sender_id.username}
+                                        </span>
+                                    )}
                                     <div className={`message-bubble ${isSent ? 'sent' : 'received'}`}>
                                         {/* VULNERABLE TO XSS: renders message HTML without escaping */}
                                         <span dangerouslySetInnerHTML={{ __html: msg.text }} />
@@ -217,12 +264,14 @@ const ChatWindow = ({ chat, messages, setMessages }) => {
                     })}
                 </AnimatePresence>
 
-                {isTyping && (
-                    <motion.div className="typing-indicator" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                        <div className="typing-dots"><span /><span /><span /></div>
-                        {other.name || other.username} is typing...
-                    </motion.div>
-                )}
+                <AnimatePresence>
+                    {isTyping && !chat.isGroupChat && (
+                        <motion.div className="typing-indicator" initial={{ opacity: 0, height: 0, marginTop: 0 }} animate={{ opacity: 1, height: 'auto', marginTop: 10 }} exit={{ opacity: 0, height: 0, marginTop: 0 }}>
+                            <div className="typing-dots"><span /><span /><span /></div>
+                            {other?.name || other?.username || 'User'} is typing...
+                        </motion.div>
+                    )}
+                </AnimatePresence>
                 <div ref={endRef} />
             </div>
 

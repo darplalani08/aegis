@@ -7,8 +7,10 @@ const {
     changePassword,
     blockUser,
     searchUsers,
+    getAllUsers,
 } = require('../controllers/userController');
 
+router.get('/', protect, getAllUsers);
 router.get('/search', protect, searchUsers);
 router.get('/:userId', protect, getProfile);
 router.put('/profile', protect, updateProfile);
