@@ -9,7 +9,14 @@ const userSocketMap = new Map();
 const initSocket = (server) => {
     io = new Server(server, {
         cors: {
-            origin: process.env.CLIENT_URL || 'http://localhost:5173',
+            origin: function (origin, callback) {
+                if (!origin) return callback(null, true);
+                if (origin.endsWith('nextalk.co.in') || origin.includes('localhost') || origin === process.env.CLIENT_URL) {
+                    callback(null, true);
+                } else {
+                    callback(new Error('Not allowed by CORS: ' + origin));
+                }
+            },
             methods: ['GET', 'POST'],
             credentials: true,
         },

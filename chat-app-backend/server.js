@@ -20,7 +20,26 @@ initSocket(server);
 
 // Middleware
 app.use(cors({
-    origin: [process.env.CLIENT_URL || 'http://localhost:5173', 'http://localhost:5174'],
+    origin: function (origin, callback) {
+        // List of explicit allowed origins
+        const allowedOrigins = [
+            process.env.CLIENT_URL,
+            'https://www.nextalk.co.in',
+            'https://nextalk.co.in',
+            'http://localhost:5173',
+            'http://localhost:5174'
+        ];
+
+        // Allow requests with no origin (like mobile apps, curl, or Postman)
+        if (!origin) return callback(null, true);
+
+        // Check if origin matches allowed list, or ends with our domain
+        if (allowedOrigins.includes(origin) || origin.endsWith('nextalk.co.in')) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS: ' + origin));
+        }
+    },
     credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
