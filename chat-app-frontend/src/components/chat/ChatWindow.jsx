@@ -26,7 +26,7 @@ const GroupAvatar = ({ name }) => (
     </div>
 );
 
-const ChatWindow = ({ chat, messages, setMessages }) => {
+const ChatWindow = ({ chat, messages, setMessages, onBack }) => {
     const { user, authAxios, API_URL } = useAuth();
     const { onlineUsers, typingUsers, sendMessage, emitTyping, markRead } = useSocket();
     const [loading, setLoading] = useState(false);
@@ -133,6 +133,11 @@ const ChatWindow = ({ chat, messages, setMessages }) => {
             {/* Header */}
             <div className="chat-window-header">
                 <div className="user-info">
+                    {onBack && (
+                        <button className="mobile-back-btn" onClick={onBack} title="Back">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+                        </button>
+                    )}
                     {chat.isGroupChat ? (
                         <>
                             <GroupAvatar name={chat.chatName} />

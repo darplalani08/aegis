@@ -26,6 +26,15 @@ const ChatInterface = () => {
     const [searchUsers, setSearchUsers] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState('chats');
+    const [mobileView, setMobileView] = useState('list');
+    const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+    // Track window resize for mobile detection
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth <= 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     const { user, logout, authAxios, API_URL } = useAuth();
     const { socket } = useSocket();
@@ -61,7 +70,8 @@ const ChatInterface = () => {
         return () => { s.off('receive_private_message', onNew); s.off('message_sent', onSent); s.off('message_edited', onEdited); s.off('message_deleted', onDeleted); s.off('message_reacted', onReacted); s.off('messages_read', onRead); };
     }, [socket, user, loadChats]);
 
-    const handleSelectChat = (chat) => { setActiveChat(chat); setMessages([]); setActiveTab('chats'); };
+    const handleSelectChat = (chat) => { setActiveChat(chat); setMessages([]); setActiveTab('chats'); if (isMobile) setMobileView('chat'); };
+    const handleMobileBack = () => { setMobileView('list'); };
 
     // Start a chat from any view (Contacts, Search, etc.)
     const handleStartChatWithUser = async (selectedUser) => {
@@ -119,8 +129,8 @@ const ChatInterface = () => {
     };
 
     return (
-        <div className="chat-app">
-            {/* Left Icon Navbar */}
+        <div className={`chat-app ${isMobile ? (mobileView === 'chat' ? 'mobile-show-chat' : 'mobile-show-list') : ''}`}>
+            {/* Left Icon Navbar (hidden on mobile via CSS) */}
             <IconNavbar
                 activeTab={activeTab}
                 onTabChange={handleTabChange}
@@ -131,7 +141,7 @@ const ChatInterface = () => {
             {renderLeftPanel()}
 
             {/* Chat Window */}
-            {activeChat && <ChatWindow chat={activeChat} messages={messages} setMessages={setMessages} />}
+            {activeChat && <ChatWindow chat={activeChat} messages={messages} setMessages={setMessages} onBack={isMobile ? handleMobileBack : null} />}
 
             {/* Right Contact Info Panel */}
             {activeChat && <ContactPanel activeChat={activeChat} otherUser={otherUser} />}
@@ -144,6 +154,32 @@ const ChatInterface = () => {
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* Mobile Bottom Navigation */}
+            {isMobile && (
+                <nav className="mobile-bottom-nav">
+                    <button className={`mob-nav-item ${activeTab === 'chats' ? 'active' : ''}`} onClick={() => { handleTabChange('chats'); setMobileView('list'); }}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+                        Chats
+                    </button>
+                    <button className={`mob-nav-item ${activeTab === 'contacts' ? 'active' : ''}`} onClick={() => { handleTabChange('contacts'); setMobileView('list'); }}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+                        Contacts
+                    </button>
+                    <button className={`mob-nav-item ${activeTab === 'search' ? 'active' : ''}`} onClick={() => { handleTabChange('search'); setMobileView('list'); }}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                        Search
+                    </button>
+                    <button className={`mob-nav-item ${activeTab === 'notifications' ? 'active' : ''}`} onClick={() => { handleTabChange('notifications'); setMobileView('list'); }}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>
+                        Alerts
+                    </button>
+                    <button className="mob-nav-item" onClick={() => setShowProfile(!showProfile)}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+                        Profile
+                    </button>
+                </nav>
+            )}
 
             {/* New Chat Modal */}
             <AnimatePresence>

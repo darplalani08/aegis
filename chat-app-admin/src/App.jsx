@@ -33,7 +33,7 @@ const AuthProvider = ({ children }) => {
 };
 
 // Sidebar
-const Sidebar = () => {
+const Sidebar = ({ className = '' }) => {
     const { admin, logout } = useAdmin();
     const loc = useLocation();
     const nav = useNavigate();
@@ -45,7 +45,7 @@ const Sidebar = () => {
     ];
 
     return (
-        <aside className="sidebar">
+        <aside className={`sidebar ${className}`}>
             <div className="sidebar-logo">
                 <div className="logo-icon-admin">N</div>
                 <span>NexTalk <small>Admin</small></span>
@@ -70,10 +70,22 @@ const Sidebar = () => {
 
 const ProtectedLayout = () => {
     const { token } = useAdmin();
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+    const loc = useLocation();
+
+    // Close sidebar on route change (mobile)
+    useEffect(() => {
+        setSidebarOpen(false);
+    }, [loc.pathname]);
+
     if (!token) return <Navigate to="/login" />;
     return (
         <div className="admin-layout">
-            <Sidebar />
+            <button className="hamburger-btn" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle menu">
+                {sidebarOpen ? '✕' : '☰'}
+            </button>
+            <div className={`sidebar-overlay ${sidebarOpen ? 'visible' : ''}`} onClick={() => setSidebarOpen(false)} />
+            <Sidebar className={sidebarOpen ? 'open' : ''} />
             <main className="admin-main">
                 <Routes>
                     <Route path="/" element={<Dashboard />} />

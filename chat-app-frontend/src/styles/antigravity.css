@@ -1402,7 +1402,88 @@ body.dark .modal-content .user-result:hover {
   background: var(--color-dark-panel);
 }
 
-/* ===== Responsive ===== */
+/* ===== Mobile Bottom Navigation ===== */
+.mobile-bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--color-white);
+  border-top: 1px solid var(--color-border);
+  padding: 6px 0 env(safe-area-inset-bottom, 6px);
+  z-index: 60;
+  justify-content: space-around;
+  align-items: center;
+}
+
+body.dark .mobile-bottom-nav {
+  background: var(--color-dark-surface);
+  border-color: var(--color-dark-border);
+}
+
+.mobile-bottom-nav .mob-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 12px;
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  font-size: 0.62rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color 0.15s;
+  position: relative;
+}
+
+.mobile-bottom-nav .mob-nav-item svg {
+  width: 22px;
+  height: 22px;
+}
+
+.mobile-bottom-nav .mob-nav-item.active {
+  color: var(--color-primary);
+}
+
+.mobile-bottom-nav .mob-nav-item .mob-badge {
+  position: absolute;
+  top: 2px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  background: var(--color-danger);
+  border-radius: 50%;
+}
+
+/* Mobile back button in chat header */
+.mobile-back-btn {
+  display: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  margin-right: 4px;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.mobile-back-btn:hover {
+  background: var(--color-bg);
+  color: var(--color-primary);
+}
+
+body.dark .mobile-back-btn:hover {
+  background: var(--color-dark-panel);
+}
+
+/* ===== Responsive: Tablet (≤960px) ===== */
 @media (max-width: 960px) {
   .icon-navbar {
     display: none;
@@ -1415,9 +1496,20 @@ body.dark .modal-content .user-result:hover {
   .contact-panel {
     display: none;
   }
+
+  .messages-area {
+    padding: 16px 24px;
+  }
+
+  .profile-panel {
+    width: 300px;
+  }
 }
 
+/* ===== Responsive: Mobile (≤768px) ===== */
 @media (max-width: 768px) {
+
+  /* Auth pages */
   .auth-container {
     flex-direction: column;
   }
@@ -1431,8 +1523,166 @@ body.dark .modal-content .user-result:hover {
     width: 280px;
   }
 
+  .auth-right {
+    padding: 24px 20px;
+  }
+
+  /* Chat layout: single panel on mobile */
+  .chat-app {
+    position: relative;
+  }
+
   .chat-list-panel {
     width: 100%;
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    transition: transform 0.3s ease;
+  }
+
+  .chat-window {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    transition: transform 0.3s ease;
+  }
+
+  /* When showing the list, hide the chat window */
+  .chat-app.mobile-show-list .chat-list-panel {
+    transform: translateX(0);
+  }
+
+  .chat-app.mobile-show-list .chat-window {
+    transform: translateX(100%);
+  }
+
+  /* When showing the chat, hide the list */
+  .chat-app.mobile-show-chat .chat-list-panel {
+    transform: translateX(-100%);
+  }
+
+  .chat-app.mobile-show-chat .chat-window {
+    transform: translateX(0);
+  }
+
+  /* Show back button + bottom nav on mobile */
+  .mobile-back-btn {
+    display: flex;
+  }
+
+  .mobile-bottom-nav {
+    display: flex;
+  }
+
+  /* Adjust chat area for bottom nav */
+  .chat-app {
+    height: calc(100vh - 56px);
+  }
+
+  .messages-area {
+    padding: 12px 16px;
+  }
+
+  .message-row {
+    max-width: 85%;
+  }
+
+  .message-input-bar {
+    padding: 10px 12px;
+  }
+
+  .emoji-picker-container {
+    right: 10px;
+    bottom: 56px;
+  }
+
+  /* Profile panel: full-screen overlay */
+  .profile-panel {
+    width: 100%;
+  }
+
+  /* Contact panel: full-screen overlay on mobile */
+  .contact-panel {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    z-index: 55;
+    display: block;
+  }
+
+  /* Modal: responsive width */
+  .modal-content {
+    width: calc(100% - 32px);
+    max-width: 400px;
+    margin: 0 16px;
+  }
+
+  /* Compact chat header */
+  .chat-window-header {
+    padding: 10px 12px;
+  }
+
+  .chat-list-header .header-top {
+    margin-bottom: 10px;
+  }
+}
+
+/* ===== Responsive: Phone (≤480px) ===== */
+@media (max-width: 480px) {
+
+  /* Hide auth left panel entirely */
+  .auth-left {
+    display: none;
+  }
+
+  .auth-right {
+    padding: 20px 16px;
+  }
+
+  .auth-form-box h1 {
+    font-size: 1.3rem;
+  }
+
+  .auth-bottom-bar {
+    padding: 10px;
+    font-size: 0.7rem;
+  }
+
+  /* Compact chat items */
+  .chat-item {
+    padding: 10px 14px;
+  }
+
+  .chat-item .avatar,
+  .chat-item .avatar-initials {
+    width: 40px;
+    height: 40px;
+  }
+
+  .chat-item .chat-name {
+    font-size: 0.84rem;
+  }
+
+  .chat-item .chat-preview {
+    font-size: 0.74rem;
+  }
+
+  .search-box {
+    padding: 0 14px 10px;
+  }
+
+  .chat-list-header {
+    padding: 14px 14px 0;
+  }
+
+  /* Message bubbles */
+  .message-bubble {
+    font-size: 0.84rem;
+    padding: 8px 12px;
+  }
+
+  .message-row {
+    max-width: 90%;
   }
 }
 
