@@ -55,7 +55,6 @@ body {
   background: var(--color-bg);
   color: var(--color-text);
   -webkit-font-smoothing: antialiased;
-  overflow: hidden;
 }
 
 body.dark {
