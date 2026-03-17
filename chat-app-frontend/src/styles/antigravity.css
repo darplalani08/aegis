@@ -180,7 +180,7 @@ body.dark ::-webkit-scrollbar-thumb {
    AUTH PAGES
    =========================== */
 .auth-page {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   background: var(--color-bg);
@@ -476,7 +476,7 @@ body.dark ::-webkit-scrollbar-thumb {
    =========================== */
 .chat-app {
   display: flex;
-  height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   background: var(--color-bg);
 }
@@ -1576,7 +1576,7 @@ body.dark .mobile-back-btn:hover {
 
   /* Adjust chat area for bottom nav */
   .chat-app {
-    height: calc(100vh - 56px);
+    height: calc(100dvh - 56px);
   }
 
   .messages-area {

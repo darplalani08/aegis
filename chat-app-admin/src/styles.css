@@ -41,7 +41,7 @@ a {
 /* ===== Layout ===== */
 .admin-layout {
     display: flex;
-    min-height: 100vh;
+    min-height: 100dvh;
 }
 
 .sidebar {
@@ -62,7 +62,7 @@ a {
     flex: 1;
     margin-left: 240px;
     padding: 28px 32px;
-    min-height: 100vh;
+    min-height: 100dvh;
 }
 
 /* Sidebar */
@@ -200,7 +200,7 @@ a {
 
 /* ===== Login ===== */
 .login-page {
-    min-height: 100vh;
+    min-height: 100dvh;
     display: flex;
     align-items: center;
     justify-content: center;
